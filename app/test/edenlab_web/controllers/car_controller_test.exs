@@ -1,29 +1,44 @@
 defmodule EdenlabWeb.CarControllerTest do
   use EdenlabWeb.ConnCase
 
+  alias Edenlab.Repo
   alias Edenlab.Vehicle
-  alias Edenlab.Vehicle.Car
+  alias Edenlab.Vehicle.Brand
+
+  @brand_attrs %{name: "BMW"}
 
   @create_attrs %{
-    body_type: "some body_type",
-    brand_id: "7488a646-e31f-11e4-aace-600308960662",
-    id: "7488a646-e31f-11e4-aace-600308960662",
-    is_electric: true,
-    model: "some model",
-    year: 42
-  }
-  @update_attrs %{
-    body_type: "some updated body_type",
-    brand_id: "7488a646-e31f-11e4-aace-600308960668",
-    id: "7488a646-e31f-11e4-aace-600308960668",
+    body_type: :sedan,
     is_electric: false,
-    model: "some updated model",
-    year: 43
+    model: "test model",
+    year: 1990
   }
-  @invalid_attrs %{body_type: nil, brand_id: nil, id: nil, is_electric: nil, model: nil, year: nil}
+  @invalid_attrs %{body_type: "random_string", brand_id: 0, id: nil, is_electric: nil, model: nil, year: nil}
 
-  def fixture(:car) do
-    {:ok, car} = Vehicle.create_car(@create_attrs)
+  def brand_fixture(attrs \\ %{}) do
+    result = %Brand{}
+      |> Brand.changeset(Enum.into(attrs, @brand_attrs))
+      |> Repo.insert()
+
+    case result do
+      {:ok, brand} -> brand
+      _ -> Repo.get_by(Vehicle, name: attrs.name)
+    end
+  end
+
+  def car_fixture(attrs \\ %{}) do
+    attrs =
+      unless Map.has_key?(attrs, :brand_id) do
+        %Brand{id: brand_id} = brand_fixture()
+        Map.put(attrs, :brand_id, brand_id)
+      else
+        attrs
+      end
+
+    {:ok, car} =
+      attrs
+      |> Enum.into(@create_attrs)
+      |> Vehicle.create_car()
     car
   end
 
@@ -32,75 +47,50 @@ defmodule EdenlabWeb.CarControllerTest do
   end
 
   describe "index" do
-    test "lists all cars", %{conn: conn} do
+    test "empty list when no cars", %{conn: conn} do
       conn = get(conn, Routes.car_path(conn, :index))
       assert json_response(conn, 200)["data"] == []
+    end
+
+    test "lists of all cars", %{conn: conn} do
+      car_fixture()
+
+      conn = get(conn, Routes.car_path(conn, :index))
+      assert json_response(conn, 200)["data"] == [
+        %{
+          "brand" => "BMW",
+          "body_type" => "sedan",
+          "is_electric" => false,
+          "model" => "test model",
+          "year" => 1990
+        }
+      ]
     end
   end
 
   describe "create car" do
     test "renders car when data is valid", %{conn: conn} do
-      conn = post(conn, Routes.car_path(conn, :create), car: @create_attrs)
-      assert %{"id" => id} = json_response(conn, 201)["data"]
-
-      conn = get(conn, Routes.car_path(conn, :show, id))
+      %Brand{id: brand_id} = brand_fixture()
+      conn = post(conn, Routes.car_path(conn, :create), Enum.into(%{brand_id: brand_id}, @create_attrs))
 
       assert %{
-               "id" => id,
-               "body_type" => "some body_type",
-               "brand_id" => "7488a646-e31f-11e4-aace-600308960662",
-               "is_electric" => true,
-               "model" => "some model",
-               "year" => 42
+               "body_type" => "sedan",
+               "brand" => "BMW",
+               "is_electric" => false,
+               "model" => "test model",
+               "year" => 1990
              } = json_response(conn, 200)["data"]
     end
 
     test "renders errors when data is invalid", %{conn: conn} do
-      conn = post(conn, Routes.car_path(conn, :create), car: @invalid_attrs)
-      assert json_response(conn, 422)["errors"] != %{}
+      conn = post(conn, Routes.car_path(conn, :create), @invalid_attrs)
+      assert json_response(conn, 422)["error"] == %{"invalid" => [
+        %{"entry" => "model", "entry_type" => "string", "rules" => [%{"description" => "can't be blank", "validation" => "required"}]},
+        %{"entry" => "year", "entry_type" => "integer", "rules" => [%{"description" => "can't be blank", "validation" => "required"}]},
+        %{"entry" => "is_electric", "entry_type" => "boolean", "rules" => [%{"description" => "can't be blank", "validation" => "required"}]},
+        %{"entry" => "brand_id", "entry_type" => "uuid", "rules" => [%{"description" => "is invalid", "validation" => "exists"}]},
+        %{"entry" => "body_type", "entry_type" => "enum", "rules" => [%{"description" => "is invalid", "validation" => "subset", "values" => ["sedan", "coupe", "pickup"]}]}
+      ]}
     end
-  end
-
-  describe "update car" do
-    setup [:create_car]
-
-    test "renders car when data is valid", %{conn: conn, car: %Car{id: id} = car} do
-      conn = put(conn, Routes.car_path(conn, :update, car), car: @update_attrs)
-      assert %{"id" => ^id} = json_response(conn, 200)["data"]
-
-      conn = get(conn, Routes.car_path(conn, :show, id))
-
-      assert %{
-               "id" => id,
-               "body_type" => "some updated body_type",
-               "brand_id" => "7488a646-e31f-11e4-aace-600308960668",
-               "is_electric" => false,
-               "model" => "some updated model",
-               "year" => 43
-             } = json_response(conn, 200)["data"]
-    end
-
-    test "renders errors when data is invalid", %{conn: conn, car: car} do
-      conn = put(conn, Routes.car_path(conn, :update, car), car: @invalid_attrs)
-      assert json_response(conn, 422)["errors"] != %{}
-    end
-  end
-
-  describe "delete car" do
-    setup [:create_car]
-
-    test "deletes chosen car", %{conn: conn, car: car} do
-      conn = delete(conn, Routes.car_path(conn, :delete, car))
-      assert response(conn, 204)
-
-      assert_error_sent 404, fn ->
-        get(conn, Routes.car_path(conn, :show, car))
-      end
-    end
-  end
-
-  defp create_car(_) do
-    car = fixture(:car)
-    %{car: car}
   end
 end

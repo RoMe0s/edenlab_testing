@@ -42,7 +42,6 @@ defmodule EdenlabWeb.ChangesetView do
     end
 
     Enum.map(errors, fn {key, error} ->
-      IO.inspect(error)
       entry_type = entry_type.(Car.__schema__(:type, key))
 
       %{
@@ -56,8 +55,6 @@ defmodule EdenlabWeb.ChangesetView do
   end
 
   def render("error.json", %{changeset: changeset}) do
-    IO.inspect(changeset)
-
     # When encoded, the changeset returns its errors
     # as a JSON object. So we just pass it forward.
     %{error: %{
