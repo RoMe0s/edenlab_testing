@@ -9,3 +9,8 @@
 #
 # We recommend using the bang functions (`insert!`, `update!`
 # and so on) as they will fail if something goes wrong.
+
+Edenlab.Repo.insert!(%Edenlab.Vehicle.Brand{name: "BMW"})
+Edenlab.Repo.insert!(%Edenlab.Vehicle.Brand{name: "Ferrari"})
+Edenlab.Repo.insert!(%Edenlab.Vehicle.Brand{name: "Tesla"})
+Edenlab.Repo.insert!(%Edenlab.Vehicle.Brand{name: "AvtoVAZ"})

@@ -7,6 +7,11 @@ defmodule EdenlabWeb.Router do
 
   scope "/api", EdenlabWeb do
     pipe_through :api
+
+    get "brand", BrandController, :index
+
+    get "car", CarController, :index
+    post "car", CarController, :create
   end
 
   # Enables LiveDashboard only for development
